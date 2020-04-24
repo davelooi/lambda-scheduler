@@ -33,7 +33,7 @@ def iterate(event:, context:)
 
   {
     index: idx,
-    continue: idx < event['iterator']['count'],
-    count: event['iterator']['count']
+    continue: idx < event.dig('iterator', 'count'),
+    count: event.dig('iterator', 'count')
   }
 end

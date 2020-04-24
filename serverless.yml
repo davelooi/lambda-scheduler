@@ -1,0 +1,61 @@
+service: lambda-scheduler
+plugins:
+  - serverless-step-functions
+provider:
+  name: aws
+  profile: lambda
+  runtime: ruby2.7
+  memorySize: 128
+  region: <region>
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - lambda:InvokeFunction
+      Resource: "arn:aws:lambda:<region>:<account>:function:*"
+    - Effect: Allow
+      Action:
+        - states:CreateStateMachine
+      Resource: "arn:aws:states:<region>:<account>:stateMachine:*"
+  environment:
+    STAGE: ${self:provider.stage}
+    REGION: <region>
+functions:
+  ping:
+    handler: scheduler.ping
+  iterate:
+    handler: scheduler.iterate
+stepFunctions:
+  stateMachines:
+    ten_seconds:
+      events:
+        - schedule: cron(* * * * ? *)
+      definition:
+        Comment: Invoke Lambda every 10 seconds
+        StartAt: ConfigureCount
+        States:
+          ConfigureCount:
+            Type: Pass
+            Result:
+              index: 0
+              count: 6
+            ResultPath: "$.iterator"
+            Next: "Iterator"
+          Iterator:
+            Type: Task
+            Resource: arn:aws:lambda:<region>:<account>:function:lambda-scheduler-${self:provider.stage}-iterate
+            ResultPath: "$.iterator"
+            Next: IsCountReached
+          IsCountReached:
+            Type: Choice
+            Choices:
+            - Variable: "$.iterator.continue"
+              BooleanEquals: true
+              Next: Wait
+            Default: Done
+          Wait:
+            Type: Wait
+            Seconds: 10
+            Next: Iterator
+          Done:
+            Type: Pass
+            End: true
